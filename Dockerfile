@@ -1,17 +1,27 @@
-FROM ubuntu:latest
+# ---------- build stage ----------
+FROM alpine:3.21 AS build
 
-RUN apt-get update && apt-get upgrade -y
-RUN apt-get install -y git g++
+RUN apk add --no-cache build-base
 
-COPY . /app
 WORKDIR /app
 
-RUN git submodule update --init --recursive
-RUN mkdir bin
-RUN g++ src/*.cpp -DNDEBUG -I asio/include -lpthread -o bin/cossacks3-server
+# asio is a git submodule; its headers must be present in the build context.
+# Run `git submodule update --init --recursive` before building the image.
+COPY asio/include/ asio/include/
+COPY src/ src/
 
-WORKDIR ./bin
+RUN g++ src/*.cpp -DNDEBUG -O2 -I asio/include -pthread -o /cossacks3-server
+
+# ---------- runtime stage ----------
+FROM alpine:3.21 AS runtime
+
+# musl is in the base image; the dynamically-linked binary only needs libstdc++
+# (which pulls in libgcc). Keep the runtime image minimal.
+RUN apk add --no-cache libstdc++
+
+COPY --from=build /cossacks3-server /usr/local/bin/cossacks3-server
 
 EXPOSE 31523
+USER nobody
 
-CMD ["./cossacks3-server"]
+ENTRYPOINT ["cossacks3-server"]
