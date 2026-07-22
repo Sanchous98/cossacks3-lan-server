@@ -1,0 +1,10 @@
+# keep the build context small: the build only needs src/ and asio/include/
+.git
+**/.git
+.gitmodules
+.idea
+bin
+*.exe
+README.md
+LICENSE.MIT
+docker-compose.yml
