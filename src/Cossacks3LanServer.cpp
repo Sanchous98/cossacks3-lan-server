@@ -23,10 +23,10 @@ int main()
 	{
 		//see asio examples for details about library usage
 		//https://github.com/chriskohlhoff/asio/tree/master/asio/src/examples
-		asio::io_service io_service;
-		Server server( io_service );
+		asio::io_context io_ctx;
+		Server server( io_ctx );
 		std::cout << " running on port " << port << std::endl;
-		io_service.run();
+		io_ctx.run();
 	}
 	catch ( std::exception& e )
 	{

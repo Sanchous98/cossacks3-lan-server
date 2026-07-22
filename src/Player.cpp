@@ -14,6 +14,13 @@
 */
 void Player::join_room( Room& room )
 {
+	//detach from any previously joined room first, otherwise this player's id
+	//would stay stranded in the old room's roster (see 0x19e handler)
+	if ( m_room )
+	{
+		leave_room();
+	}
+
 	if ( room.host_id() == m_id )
 	{
 		m_status = 0x05;

@@ -123,15 +123,18 @@ void Lobby::send( const Packet& p, SendTo target ) const
 
 			if      ( target == RoomHost )
 			{
-				const auto room_host_id = room->host_id();
-				m_clients.at( room_host_id )->queue_buf( buf_ptr );
+				const auto cit = m_clients.find( room->host_id() );
+				if ( m_clients.end() != cit ) cit->second->queue_buf( buf_ptr );
 			}
 			else if ( target == EveryoneInRoom )
 			{
 				const auto players = room->players();
 				for ( const auto p_id : players )
 				{
-					m_clients.at( p_id )->queue_buf( buf_ptr );
+					//skip ids missing from m_clients instead of aborting the
+					//whole broadcast mid-loop on a std::out_of_range
+					const auto cit = m_clients.find( p_id );
+					if ( m_clients.end() != cit ) cit->second->queue_buf( buf_ptr );
 				}
 			}
 			else if ( target == EveryoneInRoomButSource )
@@ -140,7 +143,8 @@ void Lobby::send( const Packet& p, SendTo target ) const
 				for ( auto p_id : players )
 				{
 					if ( src_id == p_id ) continue;
-					m_clients.at( p_id )->queue_buf( buf_ptr );
+					const auto cit = m_clients.find( p_id );
+					if ( m_clients.end() != cit ) cit->second->queue_buf( buf_ptr );
 				}
 			}
 			else if ( target == PropagateInRoom )
@@ -153,13 +157,15 @@ void Lobby::send( const Packet& p, SendTo target ) const
 					for ( auto p_id : room->players() )
 					{
 						if ( p_id == src_id ) continue;
-						m_clients.at( p_id )->queue_buf( buf_ptr );
+						const auto cit = m_clients.find( p_id );
+						if ( m_clients.end() != cit ) cit->second->queue_buf( buf_ptr );
 					}
 				}
 				else
 				{
 					//player -> room host
-					m_clients.at( room_host_id )->queue_buf( buf_ptr );
+					const auto cit = m_clients.find( room_host_id );
+					if ( m_clients.end() != cit ) cit->second->queue_buf( buf_ptr );
 				}
 			}
 		}
@@ -513,9 +519,14 @@ void Lobby::process_buf( std::shared_ptr<Client> client )
 		const auto info  = p.read_string();
 		const auto magic = p.read_int();
 
-		//create player object and get reference at one go
-		auto& room   = m_rooms.emplace( c_id, std::make_unique<Room>( c_id, desc ) ).first->second;
+		//look up the player BEFORE inserting into m_rooms, so a 0x19c that arrives
+		//before login (no Player yet) cannot leave an orphan room behind
 		auto& player = m_players.at( c_id );
+		//ignore duplicate create requests instead of double-adding the host
+		if ( player->room() ) return;
+		auto res = m_rooms.emplace( c_id, std::make_unique<Room>( c_id, desc ) );
+		if ( !res.second ) return;//a room with this host id already exists
+		auto& room = res.first->second;
 		//establish Player <> Room link for future lookups, add player id to Room::m_players
 		player->join_room( *room );
 
@@ -538,7 +549,8 @@ void Lobby::process_buf( std::shared_ptr<Client> client )
 		p.write_string( info );
 		p.write_int( magic );
 		p.write_short( 0 );
-		p.write_header( 0x19d, id1, 0 );
+		//use the authenticated session id, not the client-supplied header id1
+		p.write_header( 0x19d, c_id, 0 );
 		send( p, Everyone );
 	}
 	else if ( 0x19e == cmd /* join room               */ )
@@ -552,7 +564,8 @@ void Lobby::process_buf( std::shared_ptr<Client> client )
 		const int room_host_id = p.read_int();
 
 		auto& room   = m_rooms.at( room_host_id );
-		auto& player = m_players.at( id1 );
+		//identify the joining player by the authenticated session id, not header id1
+		auto& player = m_players.at( c_id );
 		//establish Player <> Room link for future lookups, add player id to Room::m_players
 		player->join_room( *room );
 
@@ -566,7 +579,7 @@ void Lobby::process_buf( std::shared_ptr<Client> client )
 		p.seek_to_start();
 		p.write_int( room_host_id );
 		p.write_byte( player->status() );
-		p.write_header( 0x19f, id1, 0 );
+		p.write_header( 0x19f, c_id, 0 );
 		send( p, Everyone );
 	}
 	else if ( 0x1a0 == cmd /* leave room or game      */ )
@@ -792,6 +805,7 @@ void Lobby::process_buf( std::shared_ptr<Client> client )
 		if ( !room ) return;//should never happen
 		auto players = room->players();
 		
+		room->set_description( desc );
 		room->set_info( info );
 
 		/* 0x1a5 notification format
@@ -845,6 +859,14 @@ void Lobby::process_buf( std::shared_ptr<Client> client )
 			4 int = id of kicked player
 		*/
 		const unsigned int kick_id = p.read_int();
+
+		//remove the kicked player from the room server-side (mirrors the 0x1a0
+		//leave path); without this the player lingers in the roster as a ghost
+		auto kit = m_players.find( kick_id );
+		if ( m_players.end() != kit && kit->second->room() )
+		{
+			kit->second->leave_room();
+		}
 
 		//0x1b6 notification format same as 0x1b5 message
 		p.keep_whole_message( 0x1b6 );

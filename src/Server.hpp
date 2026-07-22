@@ -17,7 +17,7 @@ const unsigned short port = 31523;
 class Server
 {
 public:
-	Server( asio::io_service& io_service );
+	Server( asio::io_context& io_ctx );
 
 private:
 	void do_accept();

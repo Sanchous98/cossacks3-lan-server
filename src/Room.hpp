@@ -31,6 +31,7 @@ public:
 	const std::string&        info() const { return m_info;        };
 
 	void set_info( const std::string& s ) { m_info    =  s; };
+	void set_description( const std::string& s ) { m_description = s; };
 	void set_new_host ( unsigned int id ) { m_host_id = id; };
 	void    add_player( unsigned int id ) { m_players.push_back( id ); };
 	void remove_player( unsigned int id ) { m_players.erase( std::remove( m_players.begin(), m_players.end(), id ), m_players.end() ); };
@@ -54,7 +55,7 @@ private:
 	    5) unknown / 0
 	    6) unknown / 0
 	*/
-	const std::string m_description;
+	std::string m_description;
 	unsigned int m_host_id;
 	std::string  m_info;
 	IdVector     m_players;

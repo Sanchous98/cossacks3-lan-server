@@ -56,7 +56,7 @@ To compile, execute the following command in the source code directory:
 
 ```bash
 $ git submodule update --init --recursive
-$ g++ src/*.cpp -DNDEBUG -I asio/asio/include -lpthread -o cossacks3-server
+$ g++ src/*.cpp -DNDEBUG -I asio/include -lpthread -o cossacks3-server
 ```
 You should be able to compile without *boost*, since *ASIO_STANDALONE* is defined in the headers.
 

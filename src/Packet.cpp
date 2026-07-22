@@ -53,6 +53,8 @@ std::ostream& operator<< ( std::ostream &out, const Packet &p )
 */
 unsigned char Packet::read_byte()
 {
+	if ( m_seek_pos >= m_buf.size() )
+		throw std::out_of_range( "Packet::read_byte() past buffer end" );
 	return m_buf[m_seek_pos++];
 }
 unsigned short Packet::read_short()
@@ -78,6 +80,8 @@ std::string Packet::read_string( LengthType lt )//default: Byte
 	if      ( Byte  == lt ) l = read_byte();
 	else if ( Short == lt ) l = read_short();
 	else if ( Int   == lt ) l = read_int();
+	if ( m_seek_pos > m_buf.size() || l > m_buf.size() - m_seek_pos )
+		throw std::out_of_range( "Packet::read_string() length exceeds buffer" );
 	const std::string str( reinterpret_cast<const char*>( &m_buf[m_seek_pos] ), l );
 	m_seek_pos += static_cast<unsigned int>( l );
 	return str;
@@ -89,6 +93,8 @@ std::string Packet::read_string( LengthType lt )//default: Byte
 */
 void Packet::write_byte( unsigned char b )
 {
+	if ( m_seek_pos >= m_buf.size() )
+		throw std::out_of_range( "Packet::write_byte() past buffer end" );
 	m_buf[m_seek_pos++] = b;
 }
 void Packet::write_short( unsigned short s )
@@ -114,6 +120,8 @@ void Packet::write_string( const std::string& str, LengthType lt )//default: Byt
 	if      ( Byte  == lt ) write_byte ( static_cast<unsigned char> ( l ) );
 	else if ( Short == lt )	write_short( static_cast<unsigned short>( l ) );
 	else if ( Int   == lt )	write_int  ( static_cast<unsigned int>  ( l ) );
+	if ( m_seek_pos > m_buf.size() || l > m_buf.size() - m_seek_pos )
+		throw std::out_of_range( "Packet::write_string() exceeds buffer" );
 	std::memcpy( &m_buf[m_seek_pos], str.c_str(), l );
 	m_seek_pos += static_cast<unsigned int> ( l );
 }

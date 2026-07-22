@@ -8,7 +8,7 @@ WORKDIR /app
 
 RUN git submodule update --init --recursive
 RUN mkdir bin
-RUN g++ src/*.cpp -DNDEBUG -I asio/asio/include -lpthread -o bin/cossacks3-server
+RUN g++ src/*.cpp -DNDEBUG -I asio/include -lpthread -o bin/cossacks3-server
 
 WORKDIR ./bin
 
